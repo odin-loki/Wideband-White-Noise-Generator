@@ -26,5 +26,6 @@
 ## Components
 - High Voltage Zener Diode (Avalanche)
 - IMPAT Diode
+- https://store.qorvo.com/products/detail/qpd0020-qorvo/637038/ or https://www.ampleon.com/products/general-purpose-wideband/50-v/CLF1G0060S-30.html
 
 Project most probably made using a IMPAT diode and decent oscillator circuits. White Noise may be generated using a Single Feedback Zener Diode. I still need to do some research on White Noise Generation. I cannot be bothered modulating anything. All design should be simple, cheap and making use of High Power Components that do simply what they are mathematically intended to do.
