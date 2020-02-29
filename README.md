@@ -15,7 +15,7 @@
 - Use of this free tool to verify, http://www.spectrum-soft.com/index.shtm
 
 
-### Theory
+## Theory
 
 - Volatge Controlled Oscillators (Variable Resistance (Potentiometer)
 - Capacitance Controlled Oscillators (Voltage Controlled Components (Varactor) / Mechanical Components (Butterfly or Differential))
@@ -23,7 +23,7 @@
 - Avalanche Breakdown (Source of White Noise (Avalanche Diode))
 - Avalanche Transistor
 
-### Components
+## Components
 - High Voltage Zener Diode (Avalanche)
 - IMPAT Diode
 
