@@ -62,3 +62,7 @@ Project most probably made using a IMPAT diode and decent oscillator circuits. W
 
 ## Notes 29/02/2020
 Since I found a High Power Transistor/Amplifier. Pretty sure I just need to find some High Power RLC components and build an Oscillator and give it power. What I really need to do, is figure out how to make the Oscillator tunable, so I get the full 100 watts across the DC to 14 Ghz Spectrum. That is with a Varactor or Potentiometer. I want a feedback circuit, so when the frequency is high enough (14 Ghz) it will cutoff and rebegin at DC. Maybe off the Reactance of the LC components. I will research if frequency Based Multiplexing to RLC circuits is a thing. At any rate I found the Components I need to build such a circuit. I am not considering Wideband Resistors or Capacitors, I feel at a Larger level they are simple enough in design to handle Broadband whilst 0402 SMT sizes needs specialised design considerations and testing. (Make it High Power, Make it Chunky.)
+
+## Notes 01/03/2020
+Just noticed it is a leap year. Incidently while I slept I asked myself if I could drive the amplifier transistor in Avalanche Breakdown mode at about 10 volts or something above the Recomended Voltage. The point is it is above the Breakdown Voltage. The current has to drop accordingly to keep the 100 watt power rating. So I am emailing the Manufacturer to ask them about the characteristics of this transistor. Will update later, it would be nice if it just generated white noise constantly distributed across the response spectrum.
+
