@@ -1,5 +1,5 @@
 # Wideband White Noise Generator
-~100 Watt, Wideband (DC to 14 Ghz), White Noise RF Signal Generator, with Sweep function.
+100 Watt, Wideband (DC to 14 Ghz), White Noise RF Signal Generator, with Sweep function.
 
 ## Use Case
 - Jamming
