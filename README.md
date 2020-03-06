@@ -66,3 +66,14 @@ Since I found a High Power Transistor/Amplifier. Pretty sure I just need to find
 ## Notes 01/03/2020
 Just noticed it is a leap year. Incidently while I slept I asked myself if I could drive the amplifier transistor in Avalanche Breakdown mode at about 10 volts or something above the Recomended Voltage. The point is it is above the Breakdown Voltage. The current has to drop accordingly to keep the 100 watt power rating. So I am emailing the Manufacturer to ask them about the characteristics of this transistor. Will update later, it would be nice if it just generated white noise constantly distributed across the response spectrum. I also thought of a basic number for the Resistor of 100 Kilo Ohms, 400 Henries for a Inductor and 60 Farads for a Capacitor. Have no idea why but I will profile with these numbers.
 
+## Notes 06/03/2020
+
+##### More Advanced Circuit Design:
+Considering using the Oscillator Loop as an amplifier for a Phase Synced PLL Signal Generator. The PLL Generator will generate desired frequencys up to 14 GHz and feed it to the Oscillator Loop. The Loop will generate the Frquencys sent via adjusting capacitance / inductance or something?
+The question remains how to use the circuit like an amplifier to acheieve Frquency Selection or to avoid frequencys across a desired spectrum.
+
+##### Simple Circuit:
+Found suitable Voltage Supply circuits for a Simple Circuit. Will connect to power point, via adaptor. Should be universally powered.
+https://tracopower.com, TPP 100A-J Series.
+https://rdtech.en.alibaba.com/ 100 Watt, AC-DC Selectable Power Supply.
+
