@@ -1,0 +1,602 @@
+// Complete 100W Wideband Noise Generator
+// Contains all necessary systems for full physical implementation
+module complete_noise_generator (
+    // System Clock and Control
+    input wire clk_in,               // Clock for digital control
+    input wire rst_n,                // Master reset
+    input wire power_switch,         // Main power switch
+    input wire standby_switch,       // Standby mode
+    
+    // Chua Circuit Core
+    // Op-amp controls
+    output reg [11:0] opamp1_bias,   // First op-amp bias
+    output reg [11:0] opamp2_bias,   // Second op-amp bias
+    output reg [3:0] opamp_gain_sel, // Gain selection
+    
+    // Variable components
+    output reg [7:0] ind_tune,       // Inductor tuning
+    output reg [3:0] cap_bank_sel,   // Capacitor bank select
+    output reg [3:0] res_bank_sel,   // Resistor bank select
+    
+    // Buffer stages
+    output reg [11:0] buf1_bias,     // Input buffer bias
+    output reg [11:0] buf2_bias,     // Output buffer bias
+    output reg [3:0] buf_gain_sel,   // Buffer gain select
+    
+    // Chaos Control
+    output reg [11:0] chaos_dac,     // Chaos parameter DAC
+    output reg [3:0] nonlin_sel,     // Nonlinearity select
+    
+    // Main RF Chain
+    // Driver stage
+    output reg [11:0] driver_bias,   // Driver bias control
+    output reg [11:0] driver_gain,   // Driver gain control
+    output reg driver_enable,        // Driver enable
+    
+    // Power amplifier
+    output reg [11:0] pa_bias,       // PA bias voltage
+    output reg [11:0] pa_drive,      // PA input drive
+    output reg [3:0] pa_band_sel,    // PA band select
+    output reg pa_enable,            // PA enable
+    
+    // RF Output Control
+    output reg [7:0] atten_ctrl,     // Output attenuator
+    output reg [3:0] filter_bank,    // Filter selection
+    output reg [3:0] match_ctrl,     // Impedance match
+    
+    // Power Supplies
+    // Primary supply
+    output reg ps_enable,            // Main PS enable
+    output reg ps_crowbar,           // Crowbar protection
+    output reg [11:0] ps_voltage,    // Voltage setting
+    output reg [11:0] ps_current,    // Current limit
+    
+    // Secondary supplies
+    output reg [3:0] aux_ps_en,      // Aux supply enables
+    output reg [11:0] bias_voltage,  // Bias supply setting
+    
+    // Analog Monitoring
+    input wire [11:0] fwd_power,     // Forward power ADC
+    input wire [11:0] ref_power,     // Reflected power ADC
+    input wire [11:0] pa_current,    // PA current ADC
+    input wire [11:0] pa_voltage,    // PA voltage ADC
+    input wire [11:0] temp_sense[8], // Temperature sensors
+    input wire [11:0] vswr_bridge,   // VSWR bridge
+    
+    // Protection Inputs
+    input wire temp_trip,            // Temperature trip
+    input wire vswr_trip,            // VSWR protection
+    input wire arc_detect,           // Arc detection
+    input wire ps_fault,             // Power supply fault
+    input wire current_trip,         // Current protection
+    input wire door_interlock,       // Cabinet interlock
+    
+    // Protection Outputs
+    output reg protect_trip,         // Protection active
+    output reg fast_shutdown,        // Emergency shutdown
+    output reg fault_latch,          // Fault latch
+    
+    // Cooling System
+    output reg [7:0] fan_speed,      // Fan control
+    input wire fan_tach,             // Fan speed sensor
+    input wire airflow_ok,           // Airflow sensor
+    
+    // User Interface
+    input wire [11:0] freq_pot,      // Frequency control
+    input wire [11:0] power_pot,     // Power control
+    output reg [3:0] status_leds,    // Status indicators
+    
+    // LCD Interface (Frequency Display)
+    output reg [7:0] lcd_data,       // LCD data
+    output reg lcd_rs,               // Register select
+    output reg lcd_en                // Enable
+);
+
+// System Parameters
+parameter [11:0] 
+    MAX_POWER = 12'h640,    // 100W
+    MAX_VSWR = 12'h300,     // 3:1 VSWR
+    MAX_TEMP = 12'h550,     // 85°C
+    MAX_CURRENT = 12'h800;  // Current limit
+
+// Operating States
+localparam [3:0]
+    STATE_OFF = 4'h0,
+    STATE_INIT = 4'h1,
+    STATE_STANDBY = 4'h2,
+    STATE_STARTUP = 4'h3,
+    STATE_RUN = 4'h4,
+    STATE_FAULT = 4'h5,
+    STATE_SHUTDOWN = 4'h6;
+
+// System State
+reg [3:0] state;
+reg [7:0] seq_state;
+reg [15:0] startup_timer;
+reg protection_active;
+
+// Temperature Management
+reg [11:0] max_temp;
+reg [7:0] temp_state;
+
+// Power Management
+reg [11:0] current_power;
+reg [7:0] power_state;
+
+// Frequency Management
+reg [23:0] freq_display;
+reg [3:0] lcd_state;
+
+// Main State Machine
+always @(posedge clk_in or negedge rst_n) begin
+    if (!rst_n) begin
+        init_system();
+    end else begin
+        case (state)
+            STATE_OFF: begin
+                if (power_switch && check_interlocks())
+                    state <= STATE_INIT;
+            end
+            
+            STATE_INIT: begin
+                if (init_sequence_complete())
+                    state <= STATE_STANDBY;
+            end
+            
+            STATE_STANDBY: begin
+                maintain_standby();
+                if (!standby_switch && system_ready())
+                    state <= STATE_STARTUP;
+            end
+            
+            STATE_STARTUP: begin
+                if (execute_startup())
+                    state <= STATE_RUN;
+            end
+            
+            STATE_RUN: begin
+                if (!check_protection())
+                    state <= STATE_FAULT;
+                else begin
+                    run_system();
+                    monitor_system();
+                end
+            end
+            
+            STATE_FAULT: begin
+                handle_fault();
+            end
+            
+            STATE_SHUTDOWN: begin
+                execute_shutdown();
+                if (shutdown_complete())
+                    state <= STATE_OFF;
+            end
+        endcase
+        
+        // Always running tasks
+        update_protection();
+        manage_cooling();
+        update_display();
+    end
+end
+
+// System Tasks
+task init_system;
+begin
+    // Reset all outputs
+    protect_trip <= 1'b1;
+    fast_shutdown <= 1'b0;
+    fault_latch <= 1'b0;
+    
+    // Power system init
+    ps_enable <= 1'b0;
+    ps_crowbar <= 1'b0;
+    aux_ps_en <= 4'h0;
+    
+    // RF chain init
+    pa_enable <= 1'b0;
+    driver_enable <= 1'b0;
+    atten_ctrl <= 8'hFF;
+    
+    // Set safe states
+    opamp_gain_sel <= 4'h0;
+    cap_bank_sel <= 4'h0;
+    res_bank_sel <= 4'h0;
+    
+    // Reset timers/states
+    startup_timer <= 16'h0000;
+    seq_state <= 8'h00;
+    protection_active <= 1'b0;
+end
+endtask
+
+// Power Supply Sequencing
+task execute_startup;
+begin
+    case (seq_state)
+        8'h00: begin // Enable aux supplies
+            aux_ps_en <= 4'hF;
+            if (startup_timer > 16'h0100)
+                seq_state <= 8'h01;
+            else
+                startup_timer <= startup_timer + 1;
+        end
+        
+        8'h01: begin // Set bias voltages
+            bias_voltage <= 12'h800;
+            opamp1_bias <= 12'h400;
+            opamp2_bias <= 12'h400;
+            if (startup_timer > 16'h0200)
+                seq_state <= 8'h02;
+            else
+                startup_timer <= startup_timer + 1;
+        end
+        
+        8'h02: begin // Enable main PS
+            ps_enable <= 1'b1;
+            ps_voltage <= 12'h000;
+            if (startup_timer > 16'h0300)
+                seq_state <= 8'h03;
+            else
+                startup_timer <= startup_timer + 1;
+        end
+        
+        8'h03: begin // Ramp main voltage
+            if (ps_voltage < 12'hFFF)
+                ps_voltage <= ps_voltage + 12'h010;
+            else
+                seq_state <= 8'h04;
+        end
+        
+        8'h04: begin // Enable RF chain
+            driver_enable <= 1'b1;
+            if (startup_timer > 16'h0400)
+                seq_state <= 8'h05;
+            else
+                startup_timer <= startup_timer + 1;
+        end
+        
+        8'h05: begin // Final enable
+            pa_enable <= 1'b1;
+            protect_trip <= 1'b0;
+            execute_startup = 1'b1;
+        end
+    endcase
+end
+endtask
+
+// Core Circuit Control
+task run_system;
+begin
+    // Update Chua parameters from frequency control
+    tune_chua_circuit();
+    
+    // Update RF chain
+    control_rf_chain();
+    
+    // Monitor and adjust power
+    manage_power_level();
+    
+    // Update matching network
+    adjust_impedance_match();
+end
+endtask
+
+// Chua Circuit Control
+task tune_chua_circuit;
+begin
+    // Set inductor tuning from frequency pot
+    ind_tune <= freq_pot[11:4];
+    
+    // Select appropriate capacitor bank
+    case (freq_pot[11:8])
+        4'h0: cap_bank_sel <= 4'h1;  // Lowest range
+        4'h1: cap_bank_sel <= 4'h2;
+        4'h2: cap_bank_sel <= 4'h4;
+        4'h3: cap_bank_sel <= 4'h8;  // Highest range
+        default: cap_bank_sel <= 4'h1;
+    endcase
+    
+    // Adjust op-amp gains
+    opamp_gain_sel <= freq_pot[7:4];
+    
+    // Set chaos parameters
+    chaos_dac <= {freq_pot[11:4], 4'h0};
+    
+    // Update buffer stages
+    buf1_bias <= 12'h400 + {4'h0, freq_pot[11:4]};
+    buf2_bias <= 12'h400 + {4'h0, freq_pot[11:4]};
+end
+endtask
+
+// RF Chain Control
+task control_rf_chain;
+begin
+    // Set driver stage
+    driver_bias <= 12'h400 + {4'h0, power_pot[11:4]};
+    driver_gain <= power_pot;
+    
+    // Set PA stage
+    pa_bias <= 12'h600 + {4'h0, power_pot[11:4]};
+    pa_drive <= power_pot;
+    
+    // Select output filter bank
+    filter_bank <= freq_pot[11:8];
+    
+    // Set attenuator for power control
+    atten_ctrl <= power_pot[11:4];
+end
+endtask
+
+// Power Management
+task manage_power_level;
+begin
+    // Calculate current power
+    current_power <= (fwd_power * fwd_power) >> 4;
+    
+    // Adjust drive if needed
+    if (current_power > {4'h0, power_pot})
+        pa_drive <= pa_drive - 12'h010;
+    else if (current_power < {4'h0, power_pot})
+        pa_drive <= pa_drive + 12'h001;
+        
+    // Monitor current
+    if (pa_current > MAX_CURRENT)
+        protect_trip <= 1'b1;
+end
+endtask
+
+// Protection System
+task update_protection;
+begin
+    protection_active = 
+        temp_trip || vswr_trip || arc_detect || 
+        ps_fault || current_trip || !door_interlock ||
+        !airflow_ok || (max_temp > MAX_TEMP);
+        
+    if (protection_active) begin
+        protect_trip <= 1'b1;
+        if (arc_detect || current_trip) begin
+            fast_shutdown <= 1'b1;
+            ps_crowbar <= 1'b1;
+        end
+    end
+end
+endtask
+
+// Thermal Management
+task manage_cooling;
+integer i;
+begin
+    // Find maximum temperature
+    max_temp = 12'h000;
+    for (i = 0; i < 8; i = i + 1)
+        if (temp_sense[i] > max_temp)
+            max_temp = temp_sense[i];
+            
+    // Set fan speed
+    if (max_temp > (MAX_TEMP - 12'h080))
+        fan_speed <= 8'hFF;  // Full speed
+    else
+        fan_speed <= 8'h20 + max_temp[11:4];
+end
+endtask
+
+// Output Matching
+task adjust_impedance_match;
+begin
+    // Calculate VSWR
+    if (fwd_power > 12'h010) begin  // Only adjust if power present
+        if (ref_power > (fwd_power >> 4)) begin
+            if (match_ctrl < 4'hF)
+                match_ctrl <= match_ctrl + 1;
+        end else if (match_ctrl > 4'h0) begin
+            match_ctrl <= match_ctrl - 1;
+        end
+    end
+end
+endtask
+
+// Display Update
+task update_display;
+reg [23:0] freq;
+begin
+    // Convert pot value to frequency
+    freq = {12'h000, freq_pot} * 24'd100;  // Scale to kHz
+    
+    // Only update if changed
+    if (freq != freq_display) begin
+        freq_display <= freq;
+        format_display(freq);
+    end
+end
+endtask
+
+// LCD Helper Tasks
+task format_display;
+    input [23:0] freq;
+    // LCD formatting implementation
+endtask
+
+// Status Update
+always @(posedge clk_in) begin
+    status_leds <= {
+        ps_enable,          // Power good
+        protection_active,  // Protection status
+        pa_enable,         // PA status
+        door_interlock     // Interlock status
+    };
+end
+
+// LCD Formatting and Control
+task format_display;
+    input [23:0] freq;
+    reg [3:0] digits[5:0];
+    integer i;
+begin
+    // Convert frequency to digits
+    for (i = 0; i < 6; i = i + 1) begin
+        digits[i] = freq % 10;
+        freq = freq / 10;
+    end
+    
+    // Update LCD buffer
+    case (lcd_state)
+        4'h0: begin // Set address
+            lcd_rs <= 1'b0;
+            lcd_data <= 8'h80;
+            lcd_state <= 4'h1;
+        end
+        
+        4'h1: begin // Write "FREQ:"
+            lcd_rs <= 1'b1;
+            lcd_data <= "F";
+            lcd_state <= 4'h2;
+        end
+        
+        4'h2: begin lcd_data <= "r"; lcd_state <= 4'h3; end
+        4'h3: begin lcd_data <= "e"; lcd_state <= 4'h4; end
+        4'h4: begin lcd_data <= "q"; lcd_state <= 4'h5; end
+        4'h5: begin lcd_data <= ":"; lcd_state <= 4'h6; end
+        4'h6: begin lcd_data <= " "; lcd_state <= 4'h7; end
+        
+        4'h7: begin // Write frequency digits
+            lcd_data <= digits[5] + 8'h30;
+            lcd_state <= 4'h8;
+        end
+        
+        4'h8: begin lcd_data <= digits[4] + 8'h30; lcd_state <= 4'h9; end
+        4'h9: begin lcd_data <= digits[3] + 8'h30; lcd_state <= 4'hA; end
+        4'hA: begin lcd_data <= digits[2] + 8'h30; lcd_state <= 4'hB; end
+        4'hB: begin lcd_data <= digits[1] + 8'h30; lcd_state <= 4'hC; end
+        4'hC: begin lcd_data <= digits[0] + 8'h30; lcd_state <= 4'hD; end
+        
+        4'hD: begin lcd_data <= " "; lcd_state <= 4'hE; end
+        4'hE: begin lcd_data <= "k"; lcd_state <= 4'hF; end
+        4'hF: begin 
+            lcd_data <= "H"; 
+            lcd_state <= 4'h0;
+        end
+    endcase
+end
+endtask
+
+// System Safety Checks
+function check_interlocks;
+begin
+    check_interlocks = door_interlock && 
+                      airflow_ok && 
+                      !ps_fault && 
+                      !temp_trip;
+end
+endfunction
+
+function system_ready;
+begin
+    system_ready = check_interlocks() && 
+                  !protection_active &&
+                  (max_temp < MAX_TEMP) &&
+                  (pa_current < MAX_CURRENT);
+end
+endfunction
+
+// Standby Mode Management
+task maintain_standby;
+begin
+    // Keep supplies enabled but RF disabled
+    ps_enable <= 1'b1;
+    aux_ps_en <= 4'hF;
+    pa_enable <= 1'b0;
+    driver_enable <= 1'b0;
+    
+    // Maintain minimum bias
+    opamp1_bias <= 12'h200;
+    opamp2_bias <= 12'h200;
+    bias_voltage <= 12'h400;
+    
+    // Keep cooling active
+    manage_cooling();
+end
+endtask
+
+// Shutdown Sequence
+task execute_shutdown;
+begin
+    case (seq_state)
+        8'h00: begin // Disable RF
+            pa_enable <= 1'b0;
+            driver_enable <= 1'b0;
+            seq_state <= 8'h01;
+        end
+        
+        8'h01: begin // Ramp down voltage
+            if (ps_voltage > 12'h000)
+                ps_voltage <= ps_voltage - 12'h010;
+            else
+                seq_state <= 8'h02;
+        end
+        
+        8'h02: begin // Disable supplies
+            ps_enable <= 1'b0;
+            aux_ps_en <= 4'h0;
+            seq_state <= 8'h03;
+        end
+        
+        8'h03: begin // Final shutdown
+            protect_trip <= 1'b1;
+            ps_crowbar <= 1'b0;
+            // Hold minimum fan speed
+            fan_speed <= 8'h20;
+            seq_state <= 8'h04;
+        end
+    endcase
+end
+endtask
+
+// Fault Management
+task handle_fault;
+begin
+    // Immediate actions
+    pa_enable <= 1'b0;
+    driver_enable <= 1'b0;
+    protect_trip <= 1'b1;
+    
+    // Record fault condition
+    if (temp_trip || (max_temp > MAX_TEMP))
+        fault_latch <= 1'b1;
+    if (arc_detect || current_trip) begin
+        ps_crowbar <= 1'b1;
+        fast_shutdown <= 1'b1;
+    end
+    
+    // Maintain cooling
+    fan_speed <= 8'hFF;
+    
+    // Wait for reset to clear
+    if (!power_switch)
+        state <= STATE_SHUTDOWN;
+end
+endtask
+
+// Shutdown Completion Check
+function shutdown_complete;
+begin
+    shutdown_complete = !pa_enable && 
+                       !driver_enable && 
+                       !ps_enable &&
+                       (ps_voltage == 12'h000);
+end
+endfunction
+
+// Initialization Completion Check
+function init_sequence_complete;
+begin
+    init_sequence_complete = (aux_ps_en == 4'hF) &&
+                           !ps_fault &&
+                           check_interlocks() &&
+                           (startup_timer > 16'h0100);
+end
+endfunction
+
+endmodule
