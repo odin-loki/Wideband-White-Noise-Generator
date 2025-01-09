@@ -1,9 +1,119 @@
-# Wideband White Noise Generator
-100 Watt, Wideband (DC to 14 Ghz), White Noise RF Signal Generator.
+# 100W Wideband Noise Generator
 
-## Use Case
-- Jamming
-- Testing
+A complete Verilog implementation of a high-power RF noise generation system based on the Chua circuit topology, featuring comprehensive control and protection systems for safe operation.
+
+## Features
+
+### Core Noise Generation
+- Chua circuit-based chaotic oscillator for true random noise generation
+- Dynamically tunable frequency range via variable components
+- Configurable nonlinearity characteristics for optimized noise distribution
+- High-precision op-amp control with programmable bias and gain settings
+
+### RF Power Chain
+- Complete driver and power amplifier stages
+- 100W maximum output capability
+- Configurable impedance matching network
+- Selectable filter banks for spectral shaping
+- Variable output attenuation control
+
+### Protection Systems
+- Comprehensive thermal management with multi-point sensing
+- VSWR protection with automatic impedance matching
+- Arc detection and fast shutdown capability
+- Over-current and power supply fault protection
+- Safety interlocks and emergency shutdown systems
+- Automatic cooling control with variable fan speed
+
+### Power Management
+- Sequenced startup and shutdown procedures
+- Multiple regulated power supplies for various stages
+- Crowbar protection for catastrophic fault conditions
+- Current and voltage monitoring on critical rails
+
+### User Interface
+- Real-time frequency and power adjustment
+- LCD display for parameter visualization
+- Status LED indicators for system monitoring
+- Standby mode for rapid power cycling
+
+## System States
+
+The noise generator implements a robust state machine with the following operational modes:
+
+1. OFF - System powered down
+2. INIT - Initial power-up and self-test
+3. STANDBY - Ready state with minimal power consumption
+4. STARTUP - Sequenced power-up of all subsystems
+5. RUN - Normal operation with full monitoring
+6. FAULT - Protected shutdown on error condition
+7. SHUTDOWN - Sequenced power-down procedure
+
+## Safety Features
+
+The system incorporates multiple layers of protection:
+
+- Temperature monitoring across 8 critical points
+- VSWR monitoring and automatic shutdown
+- Arc detection with microsecond response
+- Door interlock for operator safety
+- Airflow monitoring for cooling verification
+- Overcurrent protection on all power rails
+- Automatic impedance matching to prevent reflected power
+
+## Technical Specifications
+
+- Maximum Output Power: 100W
+- VSWR Protection Threshold: 3:1
+- Maximum Operating Temperature: 85°C
+- Comprehensive current limiting
+- Multiple regulated power supplies
+- Variable frequency control
+- Digital bias and gain control
+- Real-time power monitoring
+- LCD frequency display
+
+## Implementation
+
+The system is implemented in Verilog and designed for synthesis on FPGA platforms. Key components include:
+
+- Main state machine controller
+- Protection system monitor
+- Power sequencing logic
+- LCD interface controller
+- Temperature management system
+- Real-time parameter adjustment
+- Status monitoring and display
+
+## Usage Notes
+
+1. The system requires proper cooling installation before operation
+2. All interlocks must be satisfied for system enablement
+3. Allow proper warm-up time in standby mode
+4. Monitor VSWR during initial power-up
+5. Observe maximum temperature and power ratings
+
+## Getting Started
+
+1. Ensure all power and control connections are properly made
+2. Verify cooling system operation
+3. Close all safety interlocks
+4. Enable main power switch
+5. Wait for initialization completion
+6. Exit standby mode when ready
+7. Adjust frequency and power as needed
+
+## Contributing
+
+When contributing to this project, please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow the existing code style
+4. Add comprehensive test coverage
+5. Submit a pull request
+
+# Research
 
 ## Considerations
 - Analogue
